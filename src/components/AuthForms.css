@@ -1,0 +1,255 @@
+/* Authentication Forms Styles */
+.auth-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+  padding: 40px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-container {
+  max-width: 1200px;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 30px;
+  align-items: start;
+}
+
+.auth-card {
+  background: white;
+  border-radius: 20px;
+  padding: 50px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.auth-header {
+  text-align: center;
+  margin-bottom: 35px;
+}
+
+.auth-header h1 {
+  font-size: 2.2rem;
+  color: #1e3c72;
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+
+.auth-header.authority-header h1 {
+  color: #2a5298;
+}
+
+.auth-header p {
+  font-size: 1rem;
+  color: #666;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.error-alert {
+  background: #ffe6e6;
+  border-left: 4px solid #dc3545;
+  padding: 15px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #dc3545;
+  font-weight: 500;
+  margin-bottom: 20px;
+}
+
+.btn-block {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.auth-footer {
+  margin-top: 30px;
+  text-align: center;
+  padding-top: 25px;
+  border-top: 2px solid #e9ecef;
+}
+
+.auth-footer p {
+  color: #666;
+  margin-bottom: 15px;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  color: #1e3c72;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 5px;
+  transition: color 0.3s;
+}
+
+.link-button:hover {
+  color: #2a5298;
+}
+
+/* Sidebar */
+.auth-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.auth-sidebar .info-card {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 15px;
+  padding: 30px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.auth-sidebar .info-card.authority-info {
+  background: rgba(42, 82, 152, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.auth-sidebar .info-card h3 {
+  font-size: 1.3rem;
+  color: #1e3c72;
+  margin-bottom: 15px;
+  font-weight: 700;
+}
+
+.auth-sidebar .info-card.authority-info h3 {
+  color: #2a5298;
+}
+
+.auth-sidebar .info-card p {
+  color: #666;
+  line-height: 1.6;
+}
+
+.impact-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.impact-list li {
+  padding: 10px 0;
+  padding-left: 25px;
+  position: relative;
+  color: #555;
+  line-height: 1.5;
+}
+
+.impact-list li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: #28a745;
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+/* Success Card */
+.success-card {
+  text-align: center;
+  padding: 60px 40px;
+}
+
+.success-icon {
+  font-size: 5rem;
+  margin-bottom: 20px;
+}
+
+.success-card h2 {
+  color: #28a745;
+  font-size: 2rem;
+  margin-bottom: 15px;
+}
+
+.success-card p {
+  color: #666;
+  font-size: 1.1rem;
+  margin-bottom: 20px;
+}
+
+.verification-notice {
+  background: #fff3cd;
+  border-left: 4px solid #ffc107;
+  padding: 20px;
+  border-radius: 8px;
+  margin: 25px 0;
+  text-align: left;
+}
+
+.verification-notice strong {
+  color: #856404;
+  display: block;
+  margin-bottom: 10px;
+  font-size: 1.1rem;
+}
+
+.info-notice {
+  background: #e7f3ff;
+  border-left: 4px solid #2a5298;
+  padding: 15px;
+  border-radius: 8px;
+  color: #1e3c72;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+/* Responsive Design */
+@media (max-width: 968px) {
+  .auth-container {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-card {
+    padding: 35px;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-sidebar {
+    order: -1;
+  }
+
+  .auth-sidebar .info-card {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 576px) {
+  .auth-page {
+    padding: 20px 10px;
+  }
+
+  .auth-card {
+    padding: 25px 20px;
+  }
+
+  .auth-header h1 {
+    font-size: 1.8rem;
+  }
+
+  .success-card {
+    padding: 40px 20px;
+  }
+
+  .success-icon {
+    font-size: 3.5rem;
+  }
+}
