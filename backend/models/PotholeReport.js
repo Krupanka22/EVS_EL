@@ -112,7 +112,7 @@ const potholeReportSchema = new mongoose.Schema({
 });
 
 // Update the updatedAt timestamp before saving
-potholeReportSchema.pre('save', function(next) {
+potholeReportSchema.pre('save', function (next) {
   this.updatedAt = Date.now();
   next();
 });

@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import './ReportPothole.css';
+import * as aiService from '../services/aiService';
+import BoundingBoxOverlay from './BoundingBoxOverlay';
 
 const DESCRIPTION_LIMIT = 500;
 
@@ -32,12 +34,13 @@ function ReportPothole({ onNavigate }) {
     };
   }, [stream]);
 
-  // Attempt auto-location once on load (permission gated by browser)
+  // Attempt auto-locate once on load (permission gated by browser)
   useEffect(() => {
     if (!autoLocateAttempted) {
       setAutoLocateAttempted(true);
-      getCurrentLocation().catch(() => {});
+      getCurrentLocation().catch(() => { });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoLocateAttempted]);
 
   // Get GPS location and return coordinates
@@ -51,7 +54,7 @@ function ReportPothole({ onNavigate }) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const { latitude, longitude } = position.coords;
-          
+
           // Reverse geocoding using OpenStreetMap Nominatim API
           try {
             const response = await fetch(
@@ -59,13 +62,13 @@ function ReportPothole({ onNavigate }) {
             );
             const data = await response.json();
             const address = data.display_name || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
-            
+
             resolve({ latitude, longitude, address });
           } catch (error) {
-            resolve({ 
-              latitude, 
-              longitude, 
-              address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}` 
+            resolve({
+              latitude,
+              longitude,
+              address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
             });
           }
         },
@@ -81,8 +84,10 @@ function ReportPothole({ onNavigate }) {
     });
   };
 
+
+
   // Get current GPS location for form
-  const getCurrentLocation = async () => {
+  const getCurrentLocation = useCallback(async () => {
     setIsCapturingLocation(true);
     setLocationError('');
 
@@ -99,42 +104,99 @@ function ReportPothole({ onNavigate }) {
       setLocationError(error);
       setIsCapturingLocation(false);
     }
-  };
+  }, []);
 
   const getDetectionSeed = () => ({
     status: 'queued',
     label: 'Pothole',
     confidence: null,
-    severity: formData.severity || 'medium',
+    predictions: [],
+    suggestedSeverity: null,
   });
 
-  const simulateDetection = (photoId) => {
+  // Real AI detection using Roboflow
+  const detectPothole = async (photoId, imageFile) => {
     setAiStatus('processing');
-    setTimeout(() => {
+    try {
+      // Call backend detection API
+      const result = await aiService.analyzeImage(imageFile);
+
+      // If annotated image returned, convert to blob for submission
+      let annotatedFile = null;
+      if (result.annotatedImage) {
+        try {
+          const base64Response = await fetch(result.annotatedImage);
+          const blob = await base64Response.blob();
+          // Use original filename if possible, or default
+          const filename = imageFile.name || `annotated-${Date.now()}.jpg`;
+          annotatedFile = new File([blob], filename, { type: 'image/jpeg' });
+        } catch (e) {
+          console.error('Failed to convert annotated image:', e);
+        }
+      }
+
+      // Update photo with AI results
+      setFormData(prev => {
+        // Auto-suggest severity
+        if (result.detected && result.suggestedSeverity && !prev.severityManuallySet) {
+          setTimeout(() => {
+            setFormData(current => ({
+              ...current,
+              severity: result.suggestedSeverity
+            }));
+          }, 100);
+        }
+
+        return {
+          ...prev,
+          photos: prev.photos.map(photo => {
+            if (photo.id !== photoId) return photo;
+
+            return {
+              ...photo,
+              // Update URL to annotated image if available
+              url: result.annotatedImage || photo.url,
+              // Update file to annotated file if available
+              file: annotatedFile || photo.file,
+              detection: {
+                status: result.detected ? 'detected' : 'not-detected',
+                label: result.detected ? 'Pothole' : 'No pothole found',
+                confidence: result.predictions.length > 0 ? result.predictions[0].confidence : null,
+                predictions: result.predictions,
+                detectionCount: result.detectionCount,
+                suggestedSeverity: result.suggestedSeverity
+              }
+            };
+          })
+        };
+      });
+      setAiStatus('idle');
+    } catch (error) {
+      console.error('Detection error:', error);
+      // Update photo with error status
       setFormData(prev => ({
         ...prev,
         photos: prev.photos.map(photo => {
           if (photo.id !== photoId) return photo;
-          const confidence = Math.round((0.82 + Math.random() * 0.13) * 100) / 100;
           return {
             ...photo,
             detection: {
-              status: 'detected',
-              label: 'Pothole',
-              confidence,
-              severity: prev.severity || 'medium',
+              status: 'error',
+              label: 'Detection failed',
+              confidence: null,
+              error: error.message
             }
           };
         })
       }));
       setAiStatus('idle');
-    }, 1100);
+    }
   };
 
   // Handle camera capture with GPS
   const handleCameraCapture = async (e) => {
     const files = Array.from(e.target.files);
-    
+
     // Get GPS location when photo is taken
     let locationData = null;
     try {
@@ -142,7 +204,7 @@ function ReportPothole({ onNavigate }) {
     } catch (error) {
       console.error('Could not get location for photo:', error);
     }
-    
+
     files.forEach(file => {
       if (file && file.type.startsWith('image/')) {
         const reader = new FileReader();
@@ -162,7 +224,7 @@ function ReportPothole({ onNavigate }) {
               detection: getDetectionSeed()
             }]
           }));
-          simulateDetection(photoId);
+          detectPothole(photoId, file);
         };
         reader.readAsDataURL(file);
       }
@@ -181,26 +243,26 @@ function ReportPothole({ onNavigate }) {
   const openCamera = async () => {
     try {
       let mediaStream;
-      
+
       // Try to get camera - will use front camera on laptops
       try {
-        mediaStream = await navigator.mediaDevices.getUserMedia({ 
-          video: { 
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: {
             facingMode: 'user' // Front camera for laptops/desktops
           },
-          audio: false 
+          audio: false
         });
       } catch (error) {
         // Fallback to rear camera if front camera fails (mobile devices)
-        mediaStream = await navigator.mediaDevices.getUserMedia({ 
+        mediaStream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'environment' },
-          audio: false 
+          audio: false
         });
       }
-      
+
       setStream(mediaStream);
       setIsCameraOpen(true);
-      
+
       // Wait for video element to be ready
       setTimeout(() => {
         if (videoRef.current) {
@@ -230,7 +292,7 @@ function ReportPothole({ onNavigate }) {
     }
 
     const video = videoRef.current;
-    
+
     // Check if video is ready and has dimensions
     if (!video.videoWidth || !video.videoHeight) {
       alert('Camera is still loading. Please wait a moment and try again.');
@@ -270,7 +332,7 @@ function ReportPothole({ onNavigate }) {
           detection: getDetectionSeed()
         }]
       }));
-      simulateDetection(photoId);
+      detectPothole(photoId, blob);
     }, 'image/jpeg', 0.95);
 
     closeCamera();
@@ -316,20 +378,20 @@ function ReportPothole({ onNavigate }) {
                   Upload Photo
                   <span className="label-required">*</span>
                 </label>
-                
+
                 {/* Camera and Upload Buttons */}
                 <div className="camera-controls">
-                  <button 
-                    type="button" 
-                    className="btn btn-primary" 
+                  <button
+                    type="button"
+                    className="btn btn-primary"
                     onClick={openCamera}
                   >
                     <span className="btn-icon">📷</span>
                     Take Photo
                   </button>
-                  <button 
-                    type="button" 
-                    className="btn btn-secondary" 
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
                     onClick={openFilePicker}
                   >
                     <span className="btn-icon">🖼️</span>
@@ -338,19 +400,19 @@ function ReportPothole({ onNavigate }) {
                 </div>
 
                 {/* Hidden file inputs */}
-                <input 
+                <input
                   ref={cameraInputRef}
-                  type="file" 
-                  className="file-input-hidden" 
-                  accept="image/*" 
+                  type="file"
+                  className="file-input-hidden"
+                  accept="image/*"
                   capture="user"
                   onChange={handleCameraCapture}
                   style={{ display: 'none' }}
                 />
-                <input 
+                <input
                   ref={fileInputRef}
-                  type="file" 
-                  className="file-input-hidden" 
+                  type="file"
+                  className="file-input-hidden"
                   accept="image/*"
                   multiple
                   onChange={handleCameraCapture}
@@ -361,8 +423,16 @@ function ReportPothole({ onNavigate }) {
                 {formData.photos.length > 0 && (
                   <div className="image-preview-grid">
                     {formData.photos.map(photo => (
-                      <div key={photo.id} className="preview-item">
+                      <div key={photo.id} className="preview-item" style={{ position: 'relative' }}>
                         <img src={photo.url} alt={photo.name} className="preview-image" />
+
+                        {/* AI Bounding Box Overlay */}
+                        {photo.detection && photo.detection.predictions && photo.detection.predictions.length > 0 && (
+                          <BoundingBoxOverlay
+                            imageUrl={photo.url}
+                            predictions={photo.detection.predictions}
+                          />
+                        )}
 
                         {photo.detection && (
                           <div className={`ai-badge status-${photo.detection.status}`}>
@@ -372,7 +442,7 @@ function ReportPothole({ onNavigate }) {
                               : 'AI: queued'}
                           </div>
                         )}
-                        
+
                         {/* Photo Location Info */}
                         {photo.address && (
                           <div className="photo-location-badge">
@@ -380,7 +450,7 @@ function ReportPothole({ onNavigate }) {
                             <span className="location-text">{photo.address.split(',')[0]}</span>
                           </div>
                         )}
-                        
+
                         {/* Photo Details Tooltip */}
                         <div className="photo-details">
                           {photo.timestamp && (
@@ -399,10 +469,10 @@ function ReportPothole({ onNavigate }) {
                             </div>
                           )}
                         </div>
-                        
-                        <button 
+
+                        <button
                           type="button"
-                          className="btn-remove" 
+                          className="btn-remove"
                           onClick={() => removePhoto(photo.id)}
                         >
                           ✕
@@ -411,7 +481,7 @@ function ReportPothole({ onNavigate }) {
                     ))}
                   </div>
                 )}
-                
+
                 {formData.photos.length === 0 && (
                   <div className="upload-hint-box">
                     <p>No photos added yet. Use camera or upload from gallery.</p>
@@ -432,10 +502,10 @@ function ReportPothole({ onNavigate }) {
                     className="form-input"
                     placeholder="Enter street address or landmark"
                     value={formData.location}
-                    onChange={(e) => setFormData({...formData, location: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                   />
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     className="btn btn-icon"
                     onClick={getCurrentLocation}
                     disabled={isCapturingLocation}
@@ -447,13 +517,13 @@ function ReportPothole({ onNavigate }) {
                     )}
                   </button>
                 </div>
-                
+
                 {locationError && (
                   <div className="error-message">
                     ⚠️ {locationError}
                   </div>
                 )}
-                
+
                 {formData.latitude && formData.longitude && (
                   <div className="gps-info">
                     <span className="gps-label">GPS Coordinates:</span>
@@ -462,7 +532,7 @@ function ReportPothole({ onNavigate }) {
                     </span>
                   </div>
                 )}
-                
+
                 <div className="map-preview">
                   <div className="map-placeholder">
                     <span>🗺️ Map Preview</span>
@@ -485,7 +555,7 @@ function ReportPothole({ onNavigate }) {
                       name="severity"
                       value="low"
                       checked={formData.severity === 'low'}
-                      onChange={(e) => setFormData({...formData, severity: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, severity: e.target.value })}
                     />
                     <div className="severity-card">
                       <div className="severity-icon">●</div>
@@ -501,7 +571,7 @@ function ReportPothole({ onNavigate }) {
                       name="severity"
                       value="medium"
                       checked={formData.severity === 'medium'}
-                      onChange={(e) => setFormData({...formData, severity: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, severity: e.target.value })}
                     />
                     <div className="severity-card">
                       <div className="severity-icon">●</div>
@@ -517,7 +587,7 @@ function ReportPothole({ onNavigate }) {
                       name="severity"
                       value="high"
                       checked={formData.severity === 'high'}
-                      onChange={(e) => setFormData({...formData, severity: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, severity: e.target.value })}
                     />
                     <div className="severity-card">
                       <div className="severity-icon">●</div>
@@ -542,7 +612,7 @@ function ReportPothole({ onNavigate }) {
                   placeholder="Provide additional details about the pothole (size, traffic impact, nearby landmarks...)"
                   rows="4"
                   value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 ></textarea>
                 <div className="character-count">{formData.description.length} / {DESCRIPTION_LIMIT}</div>
               </div>
@@ -588,26 +658,26 @@ function ReportPothole({ onNavigate }) {
               <div className="camera-container">
                 <div className="camera-header">
                   <h3>📷 Take Photo</h3>
-                  <button 
-                    type="button" 
-                    className="btn-close-camera" 
+                  <button
+                    type="button"
+                    className="btn-close-camera"
                     onClick={closeCamera}
                   >
                     ✕
                   </button>
                 </div>
                 <div className="camera-preview">
-                  <video 
-                    ref={videoRef} 
-                    autoPlay 
+                  <video
+                    ref={videoRef}
+                    autoPlay
                     playsInline
                     className="camera-video"
                   />
                 </div>
                 <div className="camera-controls">
-                  <button 
-                    type="button" 
-                    className="btn btn-primary btn-large" 
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-large"
                     onClick={capturePhoto}
                   >
                     <span className="btn-icon">📸</span>
@@ -619,7 +689,7 @@ function ReportPothole({ onNavigate }) {
           )}
 
           {/* Hidden canvas for photo capture */}
-          <canvas ref={canvasRef} style={{display: 'none'}} />
+          <canvas ref={canvasRef} style={{ display: 'none' }} />
 
           {/* Info Sidebar */}
           <div className="info-sidebar">
