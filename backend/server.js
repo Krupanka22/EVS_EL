@@ -28,6 +28,7 @@ const detectionRoutes = require('./routes/detection');
 app.use('/api/citizen', citizenAuthRoutes);
 app.use('/api/authority', authorityAuthRoutes);
 app.use('/api', detectionRoutes);
+app.use('/api/reports', require('./routes/reports'));
 
 // Health check route
 app.get('/api/health', (req, res) => {

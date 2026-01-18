@@ -2,6 +2,9 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import './ReportPothole.css';
 import * as aiService from '../services/aiService';
 import BoundingBoxOverlay from './BoundingBoxOverlay';
+import { MapContainer, TileLayer, Marker } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import { MapPin, Camera, Image as ImageIcon, Loader, Send, FileText, Bot, Clock, AlertTriangle, Map as MapIcon } from 'lucide-react';
 
 const DESCRIPTION_LIMIT = 500;
 
@@ -220,7 +223,7 @@ function ReportPothole({ onNavigate }) {
               latitude: locationData?.latitude || null,
               longitude: locationData?.longitude || null,
               address: locationData?.address || 'Location not available',
-              timestamp: new Date().toLocaleString(),
+              timestamp: new Date().toISOString(),
               detection: getDetectionSeed()
             }]
           }));
@@ -328,7 +331,7 @@ function ReportPothole({ onNavigate }) {
           latitude: locationData?.latitude || null,
           longitude: locationData?.longitude || null,
           address: locationData?.address || 'Location not available',
-          timestamp: new Date().toLocaleString(),
+          timestamp: new Date().toISOString(),
           detection: getDetectionSeed()
         }]
       }));
@@ -343,6 +346,59 @@ function ReportPothole({ onNavigate }) {
     fileInputRef.current?.click();
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (formData.photos.length === 0) {
+      alert('Please upload at least one photo.');
+      return;
+    }
+    if (!formData.location) {
+      alert('Please provide a location.');
+      return;
+    }
+
+    try {
+      /* 
+         We need to send the data to the backend.
+         Since photos are already in base64 (data URL) in formData.photos[].url, 
+         we can send the whole object as JSON.
+         However, for large base64 strings, it might be heavy. 
+         But our backend supports it (limit 10mb).
+      */
+
+      const payload = {
+        ...formData,
+        photos: formData.photos.map(p => ({
+          url: p.url,
+          detected: p.detection?.status === 'detected',
+          confidence: p.detection?.confidence,
+          timestamp: p.timestamp
+        }))
+      };
+
+      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${API_URL}/api/reports`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        alert('Report submitted successfully!');
+        onNavigate('dashboard');
+      } else {
+        alert('Failed to submit report: ' + result.message);
+      }
+
+    } catch (error) {
+      console.error('Submission error:', error);
+      alert('Error submitting report. Please try again.');
+    }
+  };
+
   return (
     <div className="report-pothole">
       <div className="report-container">
@@ -354,15 +410,15 @@ function ReportPothole({ onNavigate }) {
 
         <div className="status-banner">
           <div className={`status-chip ${formData.latitude ? 'ok' : 'warn'}`}>
-            <span className="chip-icon">📍</span>
+            <MapPin size={18} />
             {formData.latitude ? 'GPS pinned automatically' : 'Allow location to auto-pin your report'}
           </div>
           <div className={`status-chip ${aiStatus === 'processing' ? 'busy' : 'ok'}`}>
-            <span className="chip-icon">🤖</span>
+            <Bot size={18} />
             {aiStatus === 'processing' ? 'AI scan in progress…' : 'AI-ready: scans photos for potholes'}
           </div>
           <div className="status-chip neutral">
-            <span className="chip-icon">🖼️</span>
+            <ImageIcon size={18} />
             {formData.photos.length} photo{formData.photos.length === 1 ? '' : 's'} attached
           </div>
         </div>
@@ -370,11 +426,11 @@ function ReportPothole({ onNavigate }) {
         {/* Report Form */}
         <div className="report-content">
           <div className="form-section">
-            <form className="report-form">
+            <form className="report-form" onSubmit={handleSubmit}>
               {/* Image Upload */}
               <div className="form-group">
                 <label className="form-label">
-                  <span className="label-icon">📸</span>
+                  <Camera size={20} />
                   Upload Photo
                   <span className="label-required">*</span>
                 </label>
@@ -386,7 +442,7 @@ function ReportPothole({ onNavigate }) {
                     className="btn btn-primary"
                     onClick={openCamera}
                   >
-                    <span className="btn-icon">📷</span>
+                    <Camera size={18} />
                     Take Photo
                   </button>
                   <button
@@ -394,7 +450,7 @@ function ReportPothole({ onNavigate }) {
                     className="btn btn-secondary"
                     onClick={openFilePicker}
                   >
-                    <span className="btn-icon">🖼️</span>
+                    <ImageIcon size={18} />
                     Choose from Gallery
                   </button>
                 </div>
@@ -492,7 +548,7 @@ function ReportPothole({ onNavigate }) {
               {/* Location */}
               <div className="form-group">
                 <label className="form-label">
-                  <span className="label-icon">📍</span>
+                  <MapPin size={20} />
                   Location
                   <span className="label-required">*</span>
                 </label>
@@ -511,18 +567,19 @@ function ReportPothole({ onNavigate }) {
                     disabled={isCapturingLocation}
                   >
                     {isCapturingLocation ? (
-                      <span>🔄 Getting Location...</span>
+                      <><Loader size={16} className="spinning" /> Getting Location...</>
                     ) : (
-                      <span>📍 Use Current Location</span>
+                      <><MapPin size={16} /> Use Current Location</>
                     )}
                   </button>
                 </div>
 
                 {locationError && (
                   <div className="error-message">
-                    ⚠️ {locationError}
+                    <><AlertTriangle size={16} /> {locationError}</>
                   </div>
                 )}
+
 
                 {formData.latitude && formData.longitude && (
                   <div className="gps-info">
@@ -533,77 +590,52 @@ function ReportPothole({ onNavigate }) {
                   </div>
                 )}
 
-                <div className="map-preview">
-                  <div className="map-placeholder">
-                    <span>🗺️ Map Preview</span>
-                    <p>{formData.location || 'Location will be shown here'}</p>
+                {formData.latitude && formData.longitude ? (
+                  <div className="map-preview" style={{ height: '250px', marginTop: '15px' }}>
+                    <MapContainer
+                      center={[formData.latitude, formData.longitude]}
+                      zoom={15}
+                      style={{ height: '100%', width: '100%', borderRadius: '10px' }}
+                      zoomControl={false}
+                    >
+                      <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      />
+                      <Marker position={[formData.latitude, formData.longitude]} />
+                    </MapContainer>
                   </div>
-                </div>
+                ) : (
+                  <div className="map-preview">
+                    <div className="map-placeholder">
+                      <><MapIcon size={32} /></>
+                      <p>{formData.location || 'Enable location to see map'}</p>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Severity Level */}
-              <div className="form-group">
-                <label className="form-label">
-                  <span className="label-icon">⚠️</span>
-                  Severity Level
-                  <span className="label-required">*</span>
-                </label>
-                <div className="severity-options">
-                  <label className="severity-option low">
-                    <input
-                      type="radio"
-                      name="severity"
-                      value="low"
-                      checked={formData.severity === 'low'}
-                      onChange={(e) => setFormData({ ...formData, severity: e.target.value })}
-                    />
-                    <div className="severity-card">
-                      <div className="severity-icon">●</div>
-                      <div className="severity-info">
-                        <strong>Low</strong>
-                        <span>Minor surface damage</span>
-                      </div>
-                    </div>
+
+              {/* AIDetected Severity - Read Only */}
+              {formData.photos.length > 0 && formData.photos.some(p => p.detection?.suggestedSeverity) && (
+                <div className="form-group">
+                  <label className="form-label">
+                    <Bot size={20} />
+                    AI-Detected Severity
                   </label>
-                  <label className="severity-option medium">
-                    <input
-                      type="radio"
-                      name="severity"
-                      value="medium"
-                      checked={formData.severity === 'medium'}
-                      onChange={(e) => setFormData({ ...formData, severity: e.target.value })}
-                    />
-                    <div className="severity-card">
-                      <div className="severity-icon">●</div>
-                      <div className="severity-info">
-                        <strong>Medium</strong>
-                        <span>Noticeable hole, caution needed</span>
-                      </div>
+                  <div className="ai-severity-display">
+                    <div className={`severity-badge severity-${formData.severity}`}>
+                      {formData.severity ? formData.severity.toUpperCase() : 'Analyzing...'}
                     </div>
-                  </label>
-                  <label className="severity-option high">
-                    <input
-                      type="radio"
-                      name="severity"
-                      value="high"
-                      checked={formData.severity === 'high'}
-                      onChange={(e) => setFormData({ ...formData, severity: e.target.value })}
-                    />
-                    <div className="severity-card">
-                      <div className="severity-icon">●</div>
-                      <div className="severity-info">
-                        <strong>High</strong>
-                        <span>Dangerous, immediate attention</span>
-                      </div>
-                    </div>
-                  </label>
+                    <p className="ai-note">Automatically determined from image analysis</p>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Description */}
               <div className="form-group">
                 <label className="form-label">
-                  <span className="label-icon">📝</span>
+                  <FileText size={20} />
                   Description
                   <span className="label-optional">(Optional)</span>
                 </label>
@@ -617,35 +649,13 @@ function ReportPothole({ onNavigate }) {
                 <div className="character-count">{formData.description.length} / {DESCRIPTION_LIMIT}</div>
               </div>
 
-              {/* Additional Information */}
-              <div className="form-group">
-                <label className="form-label">
-                  <span className="label-icon">ℹ️</span>
-                  Additional Information
-                </label>
-                <div className="checkbox-group">
-                  <label className="checkbox-label">
-                    <input type="checkbox" />
-                    <span>Multiple potholes in this area</span>
-                  </label>
-                  <label className="checkbox-label">
-                    <input type="checkbox" />
-                    <span>Traffic safety hazard</span>
-                  </label>
-                  <label className="checkbox-label">
-                    <input type="checkbox" />
-                    <span>Water accumulation present</span>
-                  </label>
-                </div>
-              </div>
-
               {/* Form Actions */}
               <div className="form-actions">
                 <button type="button" className="btn btn-secondary" onClick={() => onNavigate('home')}>
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary btn-large">
-                  <span className="btn-icon">📤</span>
+                  <Send size={18} />
                   Submit Report
                 </button>
               </div>
@@ -657,7 +667,7 @@ function ReportPothole({ onNavigate }) {
             <div className="camera-modal">
               <div className="camera-container">
                 <div className="camera-header">
-                  <h3>📷 Take Photo</h3>
+                  <h3><Camera size={20} style={{ display: 'inline', marginRight: '8px' }} /> Take Photo</h3>
                   <button
                     type="button"
                     className="btn-close-camera"
@@ -680,7 +690,7 @@ function ReportPothole({ onNavigate }) {
                     className="btn btn-primary btn-large"
                     onClick={capturePhoto}
                   >
-                    <span className="btn-icon">📸</span>
+                    <Camera size={18} />
                     Capture Photo
                   </button>
                 </div>
@@ -704,7 +714,7 @@ function ReportPothole({ onNavigate }) {
             </div>
 
             <div className="info-card ai-ready">
-              <h3>🤖 AI Detection Ready</h3>
+              <h3><Bot size={20} style={{ display: 'inline', marginRight: '8px' }} /> AI Detection Ready</h3>
               <p>Uploaded photos are queued for AI-assisted detection. The current build simulates results so you can design the workflow now and plug in a model later.</p>
               <div className="ai-pill-row">
                 <span className="ai-pill">Model slot: TBD</span>
@@ -728,7 +738,7 @@ function ReportPothole({ onNavigate }) {
             </div>
 
             <div className="info-card">
-              <h3>⏱️ What Happens Next?</h3>
+              <h3><Clock size={20} style={{ display: 'inline', marginRight: '8px' }} /> What Happens Next?</h3>
               <div className="timeline">
                 <div className="timeline-item">
                   <div className="timeline-dot"></div>

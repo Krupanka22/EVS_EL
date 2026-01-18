@@ -10,15 +10,13 @@ import ReportPothole from './components/ReportPothole';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('home');
-  const [userType, setUserType] = useState('citizen'); // 'citizen' or 'authority'
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
 
   // Handle login success
-  const handleLoginSuccess = (user, type) => {
+  const handleLoginSuccess = (user) => {
     setIsAuthenticated(true);
     setCurrentUser(user);
-    setUserType(type);
   };
 
   // Handle logout
@@ -27,24 +25,24 @@ function App() {
     setCurrentUser(null);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    localStorage.removeItem('userType');
     setCurrentPage('home');
   };
 
   const renderPage = () => {
-    switch(currentPage) {
+    switch (currentPage) {
       case 'home':
         return <HomePage onNavigate={setCurrentPage} />;
       case 'report':
         return <ReportPothole onNavigate={setCurrentPage} />;
-      case 'citizen-dashboard':
+      case 'dashboard':
+        // Regular dashboard shows citizen view (no auth needed)
         return <CitizenDashboard onNavigate={setCurrentPage} />;
       case 'authority-dashboard':
+        // Authority dashboard requires authentication
+        if (!isAuthenticated) {
+          return <AuthorityLogin onNavigate={setCurrentPage} onLoginSuccess={handleLoginSuccess} />;
+        }
         return <AuthorityDashboard onNavigate={setCurrentPage} />;
-      case 'dashboard':
-        return userType === 'citizen' 
-          ? <CitizenDashboard onNavigate={setCurrentPage} />
-          : <AuthorityDashboard onNavigate={setCurrentPage} />;
       case 'map':
         return <MapView onNavigate={setCurrentPage} />;
       case 'authority-login':
@@ -68,27 +66,27 @@ function App() {
               <p>Pothole Detection & Reporting</p>
             </div>
           </div>
-          
+
           <nav className="nav-menu">
-            <button 
+            <button
               className={currentPage === 'home' ? 'nav-link active' : 'nav-link'}
               onClick={() => setCurrentPage('home')}
             >
               Home
             </button>
-            <button 
+            <button
               className={currentPage === 'report' ? 'nav-link active' : 'nav-link'}
               onClick={() => setCurrentPage('report')}
             >
               Report Pothole
             </button>
-            <button 
+            <button
               className={currentPage === 'map' ? 'nav-link active' : 'nav-link'}
               onClick={() => setCurrentPage('map')}
             >
               Map View
             </button>
-            <button 
+            <button
               className={currentPage === 'dashboard' ? 'nav-link active' : 'nav-link'}
               onClick={() => setCurrentPage('dashboard')}
             >
@@ -109,7 +107,7 @@ function App() {
               </>
             ) : (
               <>
-                <button 
+                <button
                   className="btn btn-primary btn-sm"
                   onClick={() => setCurrentPage('authority-login')}
                 >

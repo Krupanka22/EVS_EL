@@ -5,6 +5,112 @@
   padding: 40px 20px;
 }
 
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.modal-content {
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.modal-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.status-timeline {
+  display: flex;
+  justify-content: space-between;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.timeline-step {
+  flex: 1;
+  text-align: center;
+  position: relative;
+}
+
+.timeline-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 15px;
+  left: 50%;
+  width: 100%;
+  height: 2px;
+  background: #ddd;
+  z-index: 0;
+}
+
+.timeline-step.completed:not(:last-child)::after {
+  background: #28a745;
+}
+
+.step-dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #ddd;
+  margin: 0 auto 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.timeline-step.completed .step-dot {
+  background: #28a745;
+}
+
+.step-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+
 .report-container {
   max-width: 1400px;
   margin: 0 auto;
@@ -236,7 +342,7 @@
 
 .image-preview-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 15px;
   margin-top: 15px;
 }
@@ -483,7 +589,7 @@
   background: white;
 }
 
-.severity-option input[type="radio"]:checked + .severity-card {
+.severity-option input[type="radio"]:checked+.severity-card {
   border-color: currentColor;
   background: rgba(255, 255, 255, 0.5);
 }
@@ -799,15 +905,15 @@
   .form-section {
     padding: 25px;
   }
-  
+
   .camera-modal {
     padding: 10px;
   }
-  
+
   .camera-container {
     max-height: 95vh;
   }
-  
+
   .camera-preview {
     min-height: 300px;
   }
@@ -829,19 +935,19 @@
   .form-actions button {
     width: 100%;
   }
-  
+
   .camera-header {
     padding: 15px 20px;
   }
-  
+
   .camera-header h3 {
     font-size: 1.1rem;
   }
-  
+
   .camera-controls {
     padding: 20px;
   }
-  
+
   .camera-controls button {
     width: 100%;
   }

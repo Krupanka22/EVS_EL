@@ -1,14 +1,61 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './AuthorityDashboard.css';
+import { BarChart3, Users, Eye, Check, UserPlus, X, MapPin, ThumbsUp } from 'lucide-react';
 
 function AuthorityDashboard({ onNavigate }) {
   const [selectedTab, setSelectedTab] = useState('pending');
-
-  const reports = {
+  const [reports, setReports] = useState({
     pending: [],
     inProgress: [],
     resolved: []
-  };
+  });
+
+  const [stats, setStats] = useState({
+    pending: 0,
+    inProgress: 0,
+    resolved: 0
+  });
+
+  useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+        const response = await fetch(`${API_URL}/api/reports`);
+        const result = await response.json();
+
+        if (result.success) {
+          const allReports = result.data;
+          const pending = allReports.filter(r => r.status === 'reported').map(formatReport);
+          const inProgress = allReports.filter(r => r.status === 'in-progress').map(formatReport);
+          const resolved = allReports.filter(r => r.status === 'resolved').map(formatReport);
+
+          setReports({ pending, inProgress, resolved });
+          setStats({
+            pending: pending.length,
+            inProgress: inProgress.length,
+            resolved: resolved.length
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching reports:', error);
+      }
+    };
+
+    fetchReports();
+  }, []);
+
+  const formatReport = (r) => ({
+    id: r._id.substring(r._id.length - 6),
+    location: r.location,
+    severity: r.severity,
+    reportedBy: r.userType === 'citizen' ? 'Citizen' : 'Authority',
+    date: new Date(r.createdAt).toLocaleDateString(),
+    votes: r.votes || 0,
+    status: r.status,
+    assignedTo: 'Unassigned', // Backend doesn't support assignment yet
+    eta: 'TBD',
+    resolvedDate: r.updatedAt ? new Date(r.updatedAt).toLocaleDateString() : '-'
+  });
 
   return (
     <div className="authority-dashboard">
@@ -21,11 +68,11 @@ function AuthorityDashboard({ onNavigate }) {
           </div>
           <div className="header-actions">
             <button className="btn btn-secondary">
-              <span className="btn-icon">📊</span>
+              <BarChart3 size={18} />
               Generate Report
             </button>
             <button className="btn btn-primary">
-              <span className="btn-icon">👥</span>
+              <Users size={18} />
               Assign Teams
             </button>
           </div>
@@ -38,7 +85,7 @@ function AuthorityDashboard({ onNavigate }) {
               <span className="stat-icon">⚠️</span>
               <h3>Pending Review</h3>
             </div>
-            <div className="stat-number">0</div>
+            <div className="stat-number">{stats.pending}</div>
             <div className="stat-footer">
               <span className="stat-trend up">Awaiting review</span>
             </div>
@@ -48,7 +95,7 @@ function AuthorityDashboard({ onNavigate }) {
               <span className="stat-icon">🔧</span>
               <h3>In Progress</h3>
             </div>
-            <div className="stat-number">0</div>
+            <div className="stat-number">{stats.inProgress}</div>
             <div className="stat-footer">
               <span className="stat-trend">No teams deployed</span>
             </div>
@@ -58,7 +105,7 @@ function AuthorityDashboard({ onNavigate }) {
               <span className="stat-icon">✓</span>
               <h3>Resolved (This Month)</h3>
             </div>
-            <div className="stat-number">0</div>
+            <div className="stat-number">{stats.resolved}</div>
             <div className="stat-footer">
               <span className="stat-trend up">Start resolving reports</span>
             </div>
@@ -90,19 +137,19 @@ function AuthorityDashboard({ onNavigate }) {
         {/* Tabs */}
         <div className="tabs-container">
           <div className="tabs-header">
-            <button 
+            <button
               className={selectedTab === 'pending' ? 'tab-btn active' : 'tab-btn'}
               onClick={() => setSelectedTab('pending')}
             >
               Pending Reports ({reports.pending.length})
             </button>
-            <button 
+            <button
               className={selectedTab === 'inProgress' ? 'tab-btn active' : 'tab-btn'}
               onClick={() => setSelectedTab('inProgress')}
             >
               In Progress ({reports.inProgress.length})
             </button>
-            <button 
+            <button
               className={selectedTab === 'resolved' ? 'tab-btn active' : 'tab-btn'}
               onClick={() => setSelectedTab('resolved')}
             >
@@ -113,9 +160,9 @@ function AuthorityDashboard({ onNavigate }) {
           {/* Reports Table */}
           <div className="reports-table-container">
             <div className="table-actions">
-              <input 
-                type="text" 
-                className="search-input" 
+              <input
+                type="text"
+                className="search-input"
                 placeholder="Search by location, ID, or reporter..."
               />
               <select className="filter-select">
@@ -151,7 +198,7 @@ function AuthorityDashboard({ onNavigate }) {
                       <tr key={report.id}>
                         <td>#{report.id}</td>
                         <td className="location-cell">
-                          <span className="location-icon">📍</span>
+                          <MapPin size={14} style={{ display: 'inline', marginRight: '4px' }} />
                           {report.location}
                         </td>
                         <td>
@@ -162,14 +209,14 @@ function AuthorityDashboard({ onNavigate }) {
                         <td>{report.reportedBy}</td>
                         <td>{report.date}</td>
                         <td>
-                          <span className="votes-badge">{report.votes} 👍</span>
+                          <span className="votes-badge">{report.votes} <ThumbsUp size={14} style={{ display: 'inline' }} /></span>
                         </td>
                         <td>
                           <div className="action-buttons">
-                            <button className="btn-action view">👁️</button>
-                            <button className="btn-action approve">✓</button>
-                            <button className="btn-action assign">👥</button>
-                            <button className="btn-action reject">✕</button>
+                            <button className="btn-action view"><Eye size={16} /></button>
+                            <button className="btn-action approve"><Check size={16} /></button>
+                            <button className="btn-action assign"><UserPlus size={16} /></button>
+                            <button className="btn-action reject"><X size={16} /></button>
                           </div>
                         </td>
                       </tr>
